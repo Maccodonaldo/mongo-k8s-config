@@ -18,13 +18,21 @@ function add_rs_member() {
   while true; do
     ismaster=$(mongo --host ${primary} --port 27017 --eval "printjson(db.isMaster())" | grep -o true)
     if [[ "$ismaster" == "true" ]]; then
+	ok=$(mongo --host ${primary} --port 27017 --quiet --eval "printjson(rs.status().ok)")
 	mongo --host ${primary} --port 27017 --eval "printjson(rs.add('$POD_IP:27017'))"
     else
 	primary=$(find_master)
+	ok=$(mongo --host ${primary} --port 27017 --quiet --eval "printjson(rs.status().ok)")
 	mongo --host ${primary} --port 27017 --eval "printjson(rs.add('$POD_IP:27017'))"
     fi
+    echo $ok
     if [[ "$?" == "0" ]]; then
-      break
+      if [[ "$ok" == "0" ]]; then
+	 # wait for rs to be initialized
+	 echo "Replicaset not ready.. Waiting"
+      else
+	 break
+      fi
     fi
     echo "Connecting to primary failed.  Waiting..."
     sleep 10
